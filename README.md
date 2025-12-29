@@ -40,7 +40,6 @@ For developers working with PostgreSQL source code or extensions, direct access 
     GDB Session Example:
     ```bash
     # 1. Start GDB with PostgreSQL backend process
-    sudo gdb -p $(pgrep -f "postgres: your_db")
 
     # 2. Set breakpoint at strategic locations
     (gdb) break pg_plan_query
@@ -75,6 +74,8 @@ cd node2graph
 ### 2. Install Dependencies
 
 ```bash
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
