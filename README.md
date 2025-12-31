@@ -58,7 +58,7 @@ For developers working with PostgreSQL source code or extensions, direct access 
 
 ## Prerequisites
 
-- Python 3.8+
+- Python 3.13+
 - Django 6.0+
 - Graphviz (system dependency)
 
@@ -210,7 +210,7 @@ sudo systemctl reload nginx
 
 Create a `Dockerfile`:
 ```dockerfile
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 WORKDIR /app
 
@@ -219,10 +219,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
 COPY . .
 
+RUN python manage.py migrate
 RUN python manage.py collectstatic --noinput
 
 EXPOSE 8000
@@ -233,7 +234,7 @@ CMD ["gunicorn", "--workers", "3", "--bind", "0.0.0.0:8000", "node2graph.wsgi:ap
 Build and run:
 ```bash
 docker build -t node2graph .
-docker run -p 8000:8000 -e DJANGO_SECRET_KEY=your-secret-key node2graph
+docker run -p 8000:8000 [-e DJANGO_SECRET_KEY=your-secret-key DJANGO_ALLOWED_HOSTS=your-machine-ip] node2graph
 ```
 
 ## Security Configuration
