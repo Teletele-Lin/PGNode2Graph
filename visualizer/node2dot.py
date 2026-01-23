@@ -32,7 +32,8 @@ class Node2DotParser:
         self.use_color = use_color
         
         # State tracking
-        self.nodes = []  # list of Node objects
+        # Initialize with a dummy node at index 0 to match C implementation (1-based indexing)
+        self.nodes = [None] 
         self.stack = []  # stack for tracking node hierarchy
         self.node_cnt = 0  # total node count
         self.node_num = 0  # current node number
@@ -76,9 +77,12 @@ class Node2DotParser:
                     self.node_num = self.node_cnt
                     
                     # Add link from parent if not root
-                    if self.node_cnt > 0:
+                    # FIX: Use level > 1 instead of node_cnt > 0.
+                    # This ensures top-level nodes (Level 1) are not linked to previous nodes,
+                    # allowing for disjoint trees (e.g. a list of Query nodes).
+                    if self.level > 1:
                         link_str = f"node{parent_node_num}:f{parent_elem_num} -> node{child_node_num}:f0\n"
-                        if parent_node_num < len(self.nodes):
+                        if parent_node_num < len(self.nodes) and self.nodes[parent_node_num]:
                             self.nodes[parent_node_num].add_link(link_str)
                 else:
                     # No valid name found, skip this node
@@ -100,8 +104,9 @@ class Node2DotParser:
                     continue
                     
                 # Restore parent state from stack
-                self.elem_num = self.stack.pop()
-                self.node_num = self.stack.pop()
+                if self.stack:
+                    self.elem_num = self.stack.pop()
+                    self.node_num = self.stack.pop()
                 self.level -= 1
                 
             elif c == ':':
@@ -113,7 +118,7 @@ class Node2DotParser:
                 name = self._get_one_name(text, i+1)
                 if name is not None:
                     i += len(name)
-                    if self.node_num < len(self.nodes):
+                    if self.node_num < len(self.nodes) and self.nodes[self.node_num]:
                         # Add element to current node
                         self.nodes[self.node_num].add_elem(name)
                         self.elem_num += 1
@@ -128,7 +133,7 @@ class Node2DotParser:
     
     def _reset_state(self):
         """Reset parser state"""
-        self.nodes = []
+        self.nodes = [None] # Reset with dummy node
         self.stack = []
         self.node_cnt = 0
         self.node_num = 0
@@ -194,6 +199,10 @@ class Node2DotParser:
         
         # Nodes
         for i, node in enumerate(self.nodes):
+            # Skip dummy node at index 0
+            if node is None:
+                continue
+                
             if not node.name:
                 continue
                 
@@ -226,6 +235,10 @@ class Node2DotParser:
         
         # Links
         for i, node in enumerate(self.nodes):
+            # Skip dummy node
+            if node is None:
+                continue
+
             if not node.name:
                 continue
                 
@@ -233,7 +246,7 @@ class Node2DotParser:
                 continue
             
             for link in node.links:
-                lines.append(link)
+                lines.append(link.rstrip()) # strip newline from link str to avoid double newlines
         
         # Footer
         lines.append("}")
@@ -291,105 +304,6 @@ def node2dot(text, skip_empty=False, skip_node_name=None, use_color=False):
 
 if __name__ == "__main__":
     # Simple test with example data
-    test_data = '''"({PLANNEDSTMT
-           :commandType 1
-           :queryId 0
-           :planId 0
-           :hasReturning false
-           :hasModifyingCTE false
-           :canSetTag true
-           :transientPlan false
-           :dependsOnRole false
-           :parallelModeNeeded false
-           :jitFlags 0
-           :planTree
-              {SEQSCAN
-              :scan.plan.disabled_nodes 0
-              :scan.plan.startup_cost 0
-              :scan.plan.total_cost 11.6
-              :scan.plan.plan_rows 160
-              :scan.plan.plan_width 4
-              :scan.plan.parallel_aware false
-              :scan.plan.parallel_safe true
-              :scan.plan.async_capable false
-              :scan.plan.plan_node_id 0
-              :scan.plan.targetlist (
-                 {TARGETENTRY
-                 :expr
-                    {VAR
-                    :varno 1
-                    :varattno 1
-                    :vartype 23
-                    :vartypmod -1
-                    :varcollid 0
-                    :varnullingrels (b)
-                    :varlevelsup 0
-                    :varreturningtype 0
-                    :varnosyn 1
-                    :varattnosyn 1
-                    :location 7
-                    }
-                 :resno 1
-                 :resname id
-                 :ressortgroupref 0
-                 :resorigtbl 16389
-                 :resorigcol 1
-                 :resjunk false
-                 }
-              )
-              :scan.plan.qual <>
-              :scan.plan.lefttree <>
-              :scan.plan.righttree <>
-              :scan.plan.initPlan <>
-              :scan.plan.extParam (b)
-              :scan.plan.allParam (b)
-              :scan.scanrelid 1
-              }
-           :partPruneInfos <>
-           :rtable (
-              {RANGETBLENTRY
-              :alias <>
-              :eref
-                 {ALIAS
-                 :aliasname customers
-                 :colnames ("id" "name" "country" "city" "registration_date")
-                 }
-              :rtekind 0
-              :relid 16389
-              :inh false
-              :relkind r
-              :rellockmode 1
-              :perminfoindex 1
-              :tablesample <> 
-              :lateral false
-              :inFromCl true
-              :securityQuals <>
-              }
-           )
-           :unprunableRelids (b 1)
-           :permInfos (
-              {RTEPERMISSIONINFO
-              :relid 16389
-              :inh true
-              :requiredPerms 2
-              :checkAsUser 0
-              :selectedCols (b 8)
-              :insertedCols (b)
-              :updatedCols (b)
-              }
-           )
-           :resultRelations <>
-           :appendRelations <>
-           :subplans <>
-           :rewindPlanIDs (b)
-           :rowMarks <>
-           :relationOids (o 16389)
-           :invalItems <>
-           :paramExecTypes <>
-           :utilityStmt <>
-           :stmt_location 0
-           :stmt_len 24
-           }"'''
-    
-    result = node2dot(test_data, use_color=True)
+    test_data = '''$7 = 0x63e291ff3d80 "({QUERY :commandType 3 :querySource 4 :canSetTag false :utilityStmt <> :resultRelation 4 :hasAggs false :hasWindowFuncs false :hasTargetSRFs false :hasSubLinks false :hasDistinctOn false :hasRecursive false :hasModifyingCTE false :hasForUpdate false :hasRowSecurity false :hasGroupRTE false :isReturn false :cteList <> :rtable ({RANGETBLENTRY :alias <> :eref {ALIAS :aliasname primary_log :colnames (\"id\" \"msg\")} :rtekind 0 :relid 24579 :inh true :relkind r :rellockmode 3 :perminfoindex 1 :tablesample <> :lateral false :inFromCl false :securityQuals <>} {RANGETBLENTRY :alias {ALIAS :aliasname old :colnames <>} :eref {ALIAS :aliasname old :colnames (\"id\" \"msg\")} :rtekind 0 :relid 24579 :inh false :relkind r :rellockmode 1 :perminfoindex 2 :tablesample <> :lateral false :inFromCl false :securityQuals <>} {RANGETBLENTRY :alias {ALIAS :aliasname new :colnames <>} :eref {ALIAS :aliasname new :colnames (\"id\" \"msg\")} :rtekind 0 :relid 24579 :inh false :relkind r :rellockmode 1 :perminfoindex 3 :tablesample <> :lateral false :inFromCl false :securityQuals <>} {RANGETBLENTRY :alias <> :eref {ALIAS :aliasname audit_log :colnames (\"log_time\" \"action\")} :rtekind 0 :relid 24584 :inh false :relkind r :rellockmode 3 :perminfoindex 4 :tablesample <> :lateral false :inFromCl false :securityQuals <>}) :rteperminfos ({RTEPERMISSIONINFO :relid 24579 :inh true :requiredPerms 10 :checkAsUser 0 :selectedCols (b 8) :insertedCols (b) :updatedCols (b)} {RTEPERMISSIONINFO :relid 24579 :inh false :requiredPerms 2 :checkAsUser 10 :selectedCols (b) :insertedCols (b) :updatedCols (b)} {RTEPERMISSIONINFO :relid 24579 :inh false :requiredPerms 2 :checkAsUser 10 :selectedCols (b) :insertedCols (b) :updatedCols (b)} {RTEPERMISSIONINFO :relid 24584 :inh false :requiredPerms 1 :checkAsUser 10 :selectedCols (b) :insertedCols (b 8 9) :updatedCols (b)}) :jointree {FROMEXPR :fromlist ({RANGETBLREF :rtindex 1}) :quals {OPEXPR :opno 96 :opfuncid 65 :opresulttype 16 :opretset false :opcollid 0 :inputcollid 0 :args ({VAR :varno 1 :varattno 1 :vartype 23 :vartypmod -1 :varcollid 0 :varnullingrels (b) :varlevelsup 0 :varreturningtype 0 :varnosyn 1 :varattnosyn 1 :location -1} {CONST :consttype 23 :consttypmod -1 :constcollid 0 :constlen 4 :constbyval true :constisnull false :location -1 :constvalue 4 [ 1 0 0 0 0 0 0 0 ]}) :location -1}} :mergeActionList <> :mergeTargetRelation 0 :mergeJoinCondition <> :targetList ({TARGETENTRY :expr {FUNCEXPR :funcid 2027 :funcresulttype 1114 :funcretset false :funcvariadic false :funcformat 2 :funccollid 0 :inputcollid 0 :args ({FUNCEXPR :funcid 1299 :funcresulttype 1184 :funcretset false :funcvariadic false :funcformat 0 :funccollid 0 :inputcollid 0 :args <> :location -1}) :location -1} :resno 1 :resname log_time :ressortgroupref 0 :resorigtbl 0 :resorigcol 0 :resjunk false} {TARGETENTRY :expr {CONST :consttype 25 :consttypmod -1 :constcollid 100 :constlen -1 :constbyval false :constisnull false :location -1 :constvalue 21 [ 84 0 0 0 65 32 114 111 119 32 119 97 115 32 100 101 108 101 116 101 100 ]} :resno 2 :resname action :ressortgroupref 0 :resorigtbl 0 :resorigcol 0 :resjunk false}) :override 0 :onConflict <> :returningOldAlias <> :returningNewAlias <> :returningList <> :groupClause <> :groupDistinct false :groupingSets <> :havingQual <> :windowClause <> :distinctClause <> :sortClause <> :limitOffset <> :limitCount <> :limitOption 0 :rowMarks <> :setOperations <> :constraintDeps <> :withCheckOptions <> :stmt_location -1 :stmt_len -1} {QUERY :commandType 4 :querySource 0 :canSetTag true :utilityStmt <> :resultRelation 1 :hasAggs false :hasWindowFuncs false :hasTargetSRFs false :hasSubLinks false :hasDistinctOn false :hasRecursive false :hasModifyingCTE false :hasForUpdate false :hasRowSecurity false :hasGroupRTE false :isReturn false :cteList <> :rtable ({RANGETBLENTRY :alias <> :eref {ALIAS :aliasname primary_log :colnames (\"id\" \"msg\")} :rtekind 0 :relid 24579 :inh true :relkind r :rellockmode 3 :perminfoindex 1 :tablesample <> :lateral false :inFromCl false :securityQuals <>}) :rteperminfos ({RTEPERMISSIONINFO :relid 24579 :inh true :requiredPerms 10 :checkAsUser 0 :selectedCols (b 8) :insertedCols (b) :updatedCols (b)}) :jointree {FROMEXPR :fromlist ({RANGETBLREF :rtindex 1}) :quals {OPEXPR :opno 96 :opfuncid 65 :opresulttype 16 :opretset false :opcollid 0 :inputcollid 0 :args ({VAR :varno 1 :varattno 1 :vartype 23 :vartypmod -1 :varcollid 0 :varnullingrels (b) :varlevelsup 0 :varreturningtype 0 :varnosyn 1 :varattnosyn 1 :location -1} {CONST :consttype 23 :consttypmod -1 :constcollid 0 :constlen 4 :constbyval true :constisnull false :location -1 :constvalue 4 [ 1 0 0 0 0 0 0 0 ]}) :location -1}} :mergeActionList <> :mergeTargetRelation 0 :mergeJoinCondition <> :targetList <> :override 0 :onConflict <> :returningOldAlias <> :returningNewAlias <> :returningList <> :groupClause <> :groupDistinct false :groupingSets <> :havingQual <> :windowClause <> :distinctClause <> :sortClause <> :limitOffset <> :limitCount <> :limitOption 0 :rowMarks <> :setOperations <> :constraintDeps <> :withCheckOptions <> :stmt_location -1 :stmt_len -1})"'''
+    result = node2dot(test_data, use_color=False)
     print(result)
