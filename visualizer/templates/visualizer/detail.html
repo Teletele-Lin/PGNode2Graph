@@ -136,6 +136,9 @@
                                 <button class="btn btn-outline-success" id="copyNodeInfoBtn">
                                     <i class="fas fa-copy"></i> Copy Node Info
                                 </button>
+                                <a href="{% url 'visualizer:open_svg' viz.id %}" class="btn btn-outline-warning" target="_blank">
+                                    <i class="fas fa-external-link-alt"></i> Open SVG
+                                </a>
                                 <button class="btn btn-outline-info" id="exportSvgBtn">
                                     <i class="fas fa-download"></i> Export as SVG
                                 </button>
@@ -484,6 +487,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 svg: svgString,
                 ready: function() {
                     var gv = this;
+                    
+                    // 设置SVG固定宽度为1200px，使其不拉伸占满窗口
+                    const svgElement = document.querySelector('#graph-area svg');
+                    if (svgElement) {
+                        svgElement.setAttribute('width', '1200');
+                        svgElement.setAttribute('height', 'auto');
+                        svgElement.style.width = '1200px';
+                        svgElement.style.height = 'auto';
+                    }
+                    
                     gv.nodes().click(function () {
                         var $set = $();
                         $set.push(this);

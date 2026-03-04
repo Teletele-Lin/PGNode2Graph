@@ -258,3 +258,13 @@ def delete_visualization(request, viz_id):
         viz.delete()
         return JsonResponse({'success': True})
     return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+def open_svg(request, viz_id):
+    """打开SVG在独立页面，支持自由缩放"""
+    viz = get_object_or_404(Visualization, id=viz_id)
+    # 生成SVG字符串
+    svg_content = generate_svg_from_dot(viz.dot_source)
+    return render(request, 'visualizer/svg_viewer.html', {
+        'viz': viz,
+        'svg_content': svg_content
+    })
